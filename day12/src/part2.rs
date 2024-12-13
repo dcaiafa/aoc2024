@@ -16,24 +16,33 @@ impl Point {
 }
 
 struct Area {
-    name: char,
+    crop_type: char,
     perim: i32,
     points: HashSet<Point>,
 }
 
 impl Area {
-    fn new(name: char) -> Rc<RefCell<Area>> {
+    fn new(crop_type: char) -> Rc<RefCell<Area>> {
         Rc::new(RefCell::new(Area {
-            name,
+            crop_type,
             perim: 0,
             points: HashSet::new(),
         }))
     }
 }
 
+#[derive(Debug, Default, Clone)]
+struct Fences {
+    t: bool,
+    b: bool,
+    l: bool,
+    r: bool,
+}
+
 struct Plot {
-    name: char,
+    crop_type: char,
     area: Option<Rc<RefCell<Area>>>,
+    fences: Fences,
 }
 
 struct Grid {
@@ -49,8 +58,9 @@ impl Grid {
             .map(|l| {
                 l.chars()
                     .map(|c| Plot {
-                        name: c,
+                        crop_type: c,
                         area: None,
+                        fences: Default::default(),
                     })
                     .collect()
             })
@@ -90,9 +100,9 @@ impl Grid {
             return;
         }
         {
-            let plot_type = self.get_plot(p.x(), p.y()).name;
+            let plot_type = self.get_plot(p.x(), p.y()).crop_type;
             let mut area = area.borrow_mut();
-            if plot_type != area.name {
+            if plot_type != area.crop_type {
                 return;
             }
             if !area.points.insert(p) {
@@ -120,6 +130,19 @@ impl Grid {
             _ => false,
         }
     }
+
+    fn get_fences(&self, n: char, x:i32, y: i32) -> Fences {
+        if !self.is_within_bounds(&Point(x,y)) {
+            return Default::default();
+        }
+
+        let plot = self.get_plot(x, y);
+        if plot.crop_type != n {
+            return Default::default();
+        }
+
+        return plot.fences.clone();
+    }
 }
 
 pub fn eval(input: &str) -> Result<i64, Error> {
@@ -129,30 +152,38 @@ pub fn eval(input: &str) -> Result<i64, Error> {
         for i in 0..grid.width {
             let plot = grid.get_plot(i, j);
             if plot.area.is_none() {
-                grid.fill(Point(i, j), Area::new(plot.name));
+                grid.fill(Point(i, j), Area::new(plot.crop_type));
             }
         }
     }
     for j in 0..grid.height {
         for i in 0..grid.width {
-            let fences: i32 = [
-                Point(i - 1, j),
-                Point(i + 1, j),
-                Point(i, j - 1),
-                Point(i, j + 1),
-            ]
-            .into_iter()
-            .map(|p| {
-                if grid.share_same_area(Point(i, j), p) {
-                    0
-                } else {
-                    1
-                }
-            })
-            .sum();
-
+            let pp = Point(i, j);
+            let fences = Fences {
+                l: !grid.share_same_area(pp, Point(i - 1, j)),
+                r: !grid.share_same_area(pp, Point(i + 1, j)),
+                t: !grid.share_same_area(pp, Point(i, j - 1)),
+                b: !grid.share_same_area(pp, Point(i, j + 1)),
+            };
+            let crop_type = grid.get_plot(i, j).crop_type;
+            let mut sides = 0;
+            if fences.l && !grid.get_fences(crop_type, i, j-1).l {
+                sides += 1;
+            }
+            if fences.r && !grid.get_fences(crop_type, i, j-1).r {
+                sides += 1;
+            }
+            if fences.t && !grid.get_fences(crop_type, i-1, j).t {
+                sides += 1;
+            }
+            if fences.b && !grid.get_fences(crop_type, i-1, j).b {
+                sides +=1;
+            }
             let plot = grid.get_mut_plot(i, j);
-            plot.area.clone().unwrap().borrow_mut().perim += fences;
+            plot.fences = fences;
+            let area = plot.area.clone().unwrap();
+            let mut area = area.borrow_mut();
+            area.perim += sides;
         }
     }
 
