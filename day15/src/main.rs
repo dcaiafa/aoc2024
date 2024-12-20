@@ -1,7 +1,7 @@
 use anyhow::{bail, Error};
 
-mod input;
 mod part1;
+mod part2;
 
 fn main() -> Result<(), Error> {
     let args: Vec<String> = std::env::args().collect();
@@ -10,8 +10,8 @@ fn main() -> Result<(), Error> {
     }
     let filename = &args[1];
     let filedata = std::fs::read_to_string(filename)?;
-    let input = input::Input::parse(&filedata)?;
-    println!("part1={}", part1::eval(&input));
+    println!("part1={}", part1::eval(&filedata)?);
+    println!("part1={}", part2::eval(&filedata)?);
     
     Ok(())
 }
