@@ -1,5 +1,6 @@
 use std::{
-    collections::{HashMap, HashSet},
+    cmp::Ordering,
+    collections::{BinaryHeap, HashSet},
     ops::{Add, Sub},
 };
 
@@ -107,95 +108,138 @@ pub fn eval(s: &str) -> i64 {
     Search::search(&maze).unwrap()
 }
 
+struct Path {
+    path: Vec<V>,
+    pos: V,
+    dir: V,
+    score: i64,
+    search_score: i64,
+}
+
+impl Path {
+    pub fn apply_step(&self, rotate: i32, maze: &Maze) -> Option<Path> {
+        let mut dir = self.dir;
+        let mut score = self.score;
+        match rotate {
+            0 => {
+                score += 1;
+            }
+            1 => {
+                dir = dir.rotate90();
+                score += 1001;
+            }
+            2 => {
+                dir = dir.rotate90().rotate90();
+                score += 2001;
+            }
+            3 => {
+                dir = dir.rotate90().rotate90().rotate90();
+                score += 1001;
+            }
+            _ => panic!("not reached"),
+        }
+
+        let pos = self.pos + dir;
+        if !maze.is_valid_pos(pos) {
+            return None;
+        }
+
+        let mut path = self.path.clone();
+        path.push(pos);
+
+        let search_score = score + min_dist(pos, maze.goal);
+
+        Some(Path {
+            path,
+            pos,
+            dir,
+            score,
+            search_score,
+        })
+    }
+}
+
+struct OrdPath(Path);
+
+impl PartialEq for OrdPath {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.search_score == other.0.search_score
+    }
+}
+
+impl Eq for OrdPath {}
+
+impl Ord for OrdPath {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.0.search_score.cmp(&self.0.search_score)
+    }
+}
+
+impl PartialOrd for OrdPath {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 struct Search<'a> {
     maze: &'a Maze,
-    visited: HashMap<(V, V), i64>,
-    max_score: i64,
+    pqueue: BinaryHeap<OrdPath>,
+    seen: HashSet<(V, V)>,
 }
 
 impl<'a> Search<'a> {
     pub fn search(maze: &Maze) -> Option<i64> {
-        let mut ctx = Search {
+        let mut srch = Search {
             maze,
-            visited: HashMap::new(),
-            max_score: i64::MAX,
+            pqueue: BinaryHeap::new(),
+            seen: HashSet::new(),
         };
-        ctx.search_step(maze.start, V(1, 0), 0)
+
+        srch.run()
     }
 
-    fn search_step(&mut self, pos: V, dir: V, score: i64) -> Option<i64> {
-        if !self.maze.is_valid_pos(pos) {
-            return None;
-        }
+    fn run(&mut self) -> Option<i64> {
+        let initial_path = Path {
+            path: Vec::new(),
+            pos: self.maze.start,
+            dir: V(1, 0),
+            score: 0,
+            search_score: min_dist(self.maze.start, self.maze.goal),
+        };
 
-        if let Some(&visited_score) = self.visited.get(&(pos, dir)) {
-            if score > visited_score {
-                return None;
+        self.seen.insert((initial_path.pos, initial_path.dir));
+        self.pqueue.push(OrdPath(initial_path));
+
+        while !self.pqueue.is_empty() {
+            let OrdPath(path) = self.pqueue.pop().unwrap();
+
+            println!("pop {:?} {} {}", path.pos, path.score, path.search_score);
+
+            if path.pos == self.maze.goal {
+                return Some(path.score);
             }
+
+            [
+                path.apply_step(0, self.maze),
+                path.apply_step(1, self.maze),
+                path.apply_step(2, self.maze),
+                path.apply_step(3, self.maze),
+            ]
+            .into_iter()
+            .flatten()
+            .inspect(|p| println!("push {:?} {} {}", p.pos, p.score, p.search_score))
+            .for_each(|path| {
+                if self.seen.insert((path.pos, path.dir)) {
+                    self.pqueue.push(OrdPath(path));
+                }
+            });
         }
-        self.visited.insert((pos, dir), score);
 
-        if score >= self.max_score {
-            return Some(self.max_score);
-        }
-
-        //println!("step: {:?} {:?} {}", pos, dir, score);
-        //self.dump();
-
-        if pos == self.maze.goal {
-            println!("Goal! {}", score);
-            //self.dump();
-            self.max_score = score;
-            self.visited.remove(&(pos, dir));
-            return Some(score);
-        }
-
-        let res = [
-            self.search_step(pos + dir, dir, score + 1),
-            self.search_step(pos, dir.rotate90(), score + 1000),
-            self.search_step(pos, dir.rotate90().rotate90(), score + 2000),
-            self.search_step(pos, dir.rotate90().rotate90().rotate90(), score + 1000),
-        ]
-        .into_iter()
-        .flatten()
-        .min();
-
-        self.visited.remove(&(pos, dir));
-
-        res
+        None
     }
+}
 
-    fn dump(&self) {
-        let mut grid: Vec<Vec<char>> = self
-            .maze
-            .rows
-            .iter()
-            .map(|r| {
-                r.iter()
-                    .map(|b| match b {
-                        true => '.',
-                        false => '#',
-                    })
-                    .collect()
-            })
-            .collect();
-        for (pos, dir) in self.visited.keys() {
-            grid[pos.y() as usize][pos.x() as usize] = match dir {
-                V(1, 0) => '>',
-                V(-1, 0) => '<',
-                V(0, 1) => 'v',
-                V(0, -1) => '^',
-                _ => panic!("unreachable"),
-            };
-        }
-        grid[self.maze.start.y() as usize][self.maze.start.x() as usize] = 'S';
-        grid[self.maze.goal.y() as usize][self.maze.goal.x() as usize] = 'E';
-
-        for r in grid {
-            for c in r {
-                print!("{}", c);
-            }
-            println!("");
-        }
-    }
+fn min_dist(a: V, b: V) -> i64 {
+    let d = a - b;
+    (d.x().abs() + d.y().abs()) as i64
 }
