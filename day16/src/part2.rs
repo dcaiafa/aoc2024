@@ -185,6 +185,8 @@ struct Search<'a> {
     maze: &'a Maze,
     pqueue: BinaryHeap<OrdPath>,
     seen: HashSet<(V, V)>,
+    best_score: Option<i64>,
+    best_steps: HashSet<V>,
 }
 
 impl<'a> Search<'a> {
@@ -193,6 +195,8 @@ impl<'a> Search<'a> {
             maze,
             pqueue: BinaryHeap::new(),
             seen: HashSet::new(),
+            best_score: None,
+            best_steps: HashSet::new(),
         };
 
         srch.run()
@@ -200,7 +204,7 @@ impl<'a> Search<'a> {
 
     fn run(&mut self) -> Option<i64> {
         let initial_path = Path {
-            path: Vec::new(),
+            path: vec![self.maze.start],
             pos: self.maze.start,
             dir: V(1, 0),
             score: 0,
@@ -212,9 +216,24 @@ impl<'a> Search<'a> {
 
         while !self.pqueue.is_empty() {
             let OrdPath(path) = self.pqueue.pop().unwrap();
+            println!("pop {} {:?}", path.search_score, path.pos);
+
+            if let Some(best) = self.best_score {
+                if path.search_score > best {
+                    println!("Done");
+                    break;
+                }
+            }
 
             if path.pos == self.maze.goal {
-                return Some(path.score);
+                if let Some(best) = self.best_score {
+                    assert!(best == path.search_score);
+                } else {
+                    self.best_score = Some(path.search_score);
+                }
+                println!("best: {} {} {:?}", path.score, path.search_score, path.path);
+                path.path.iter().for_each(|&pos|{self.best_steps.insert(pos);});
+                continue;
             }
 
             [
@@ -226,13 +245,18 @@ impl<'a> Search<'a> {
             .into_iter()
             .flatten()
             .for_each(|path| {
+                if let Some(best) = self.best_score {
+                    if path.search_score > best {
+                        return;
+                    }
+                }
                 if self.seen.insert((path.pos, path.dir)) {
                     self.pqueue.push(OrdPath(path));
                 }
             });
         }
 
-        None
+        Some(self.best_steps.len() as i64)
     }
 }
 
