@@ -1,6 +1,6 @@
 use std::{
   cmp::Ordering,
-  collections::{BinaryHeap, HashSet},
+  collections::{BinaryHeap, HashMap, HashSet},
   ops::{Add, Sub},
 };
 
@@ -109,7 +109,7 @@ pub fn eval(s: &str) -> i64 {
 }
 
 struct Path {
-  path: HashSet<V>,
+  path: HashSet<(V,V)>,
   pos: V,
   dir: V,
   score: i64,
@@ -144,12 +144,12 @@ impl Path {
       return None;
     }
 
-    if self.path.contains(&pos) {
+    if self.path.contains(&(pos,dir)) {
       return None;
     }
 
     let mut path = self.path.clone();
-    path.insert(pos);
+    path.insert((pos,dir));
 
     let search_score = score + min_dist(pos, maze.goal);
 
@@ -176,7 +176,7 @@ impl Path {
       })
       .collect();
 
-      for pos in &self.path {
+      for &(pos,_) in &self.path {
           grid[pos.y() as usize][pos.x() as usize] = 'O'
       }
 
@@ -213,6 +213,7 @@ struct Search<'a> {
   pqueue: BinaryHeap<OrdPath>,
   best_score: Option<i64>,
   best_steps: HashSet<V>,
+  seen: HashMap<(V,V), i64>,
 }
 
 impl<'a> Search<'a> {
@@ -222,6 +223,7 @@ impl<'a> Search<'a> {
       pqueue: BinaryHeap::new(),
       best_score: None,
       best_steps: HashSet::new(),
+      seen: HashMap::new(),
     };
 
     srch.run()
@@ -238,7 +240,7 @@ impl<'a> Search<'a> {
 
     initial_path
       .path
-      .insert(initial_path.pos);
+      .insert((initial_path.pos, initial_path.dir));
     self.pqueue.push(OrdPath(initial_path));
 
     while !self.pqueue.is_empty() {
@@ -258,7 +260,7 @@ impl<'a> Search<'a> {
         } else {
           self.best_score = Some(path.search_score);
         }
-        path.path.iter().for_each(|&pos| {
+        path.path.iter().for_each(|&(pos,_)| {
           self.best_steps.insert(pos);
         });
         continue;
@@ -278,6 +280,15 @@ impl<'a> Search<'a> {
             return;
           }
         }
+        if let Some(&prev) = self.seen.get(&(path.pos, path.dir)) {
+            if path.search_score > prev {
+                return;
+            }
+            self.seen.insert((path.pos, path.dir), path.search_score);
+        } else {
+            self.seen.insert((path.pos, path.dir), path.search_score);
+        }
+
         self.pqueue.push(OrdPath(path));
       });
     }
