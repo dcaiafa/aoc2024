@@ -1,7 +1,6 @@
 use std::{
   cmp::Ordering,
   collections::{BinaryHeap, HashSet},
-  iter,
   ops::{Add, Sub},
 };
 
@@ -110,7 +109,7 @@ pub fn eval(s: &str) -> i64 {
 }
 
 struct Path {
-  path: HashSet<(V, V)>,
+  path: HashSet<V>,
   pos: V,
   dir: V,
   score: i64,
@@ -145,12 +144,12 @@ impl Path {
       return None;
     }
 
-    if self.path.contains(&(pos, dir)) {
+    if self.path.contains(&pos) {
       return None;
     }
 
     let mut path = self.path.clone();
-    path.insert((pos, dir));
+    path.insert(pos);
 
     let search_score = score + min_dist(pos, maze.goal);
 
@@ -177,14 +176,8 @@ impl Path {
       })
       .collect();
 
-      for (pos,dir) in &self.path {
-          grid[pos.y() as usize][pos.x() as usize] = match dir {
-              V(-1,0) => '<',
-              V(1,0) => '>',
-              V(0,-1) => '^',
-              V(0, 1) => 'v',
-              _ => panic!("invalid dir")
-          };
+      for pos in &self.path {
+          grid[pos.y() as usize][pos.x() as usize] = 'O'
       }
 
       for r in grid {
@@ -245,13 +238,13 @@ impl<'a> Search<'a> {
 
     initial_path
       .path
-      .insert((initial_path.pos, initial_path.dir));
+      .insert(initial_path.pos);
     self.pqueue.push(OrdPath(initial_path));
 
     while !self.pqueue.is_empty() {
       let OrdPath(path) = self.pqueue.pop().unwrap();
 
-      path.dump(self.maze);
+      //path.dump(self.maze);
 
       if let Some(best) = self.best_score {
         if path.search_score > best {
@@ -265,7 +258,7 @@ impl<'a> Search<'a> {
         } else {
           self.best_score = Some(path.search_score);
         }
-        path.path.iter().for_each(|&(pos, _)| {
+        path.path.iter().for_each(|&pos| {
           self.best_steps.insert(pos);
         });
         continue;
