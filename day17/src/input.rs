@@ -1,5 +1,3 @@
-use regex::Regex;
-
 #[derive(Debug, PartialEq, Eq)]
 pub struct Input {
   pub a: i32,
