@@ -92,6 +92,7 @@ impl VM {
         }
         7 => {
           // cdv
+          println!("discard {}", self.combo(operand));
           print!("cdv ");
           let d = 2_i64.pow(self.combo(operand) as u32);
           self.c = self.a / d;
