@@ -2,6 +2,7 @@ mod input;
 mod part1;
 mod part2;
 mod enc;
+mod vm;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
