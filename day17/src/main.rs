@@ -1,7 +1,6 @@
 mod input;
 mod part1;
 mod part2;
-mod enc;
 mod vm;
 
 fn main() {
@@ -10,7 +9,5 @@ fn main() {
     let filename = &args[1];
     let filedata = std::fs::read_to_string(filename).unwrap();
     println!("part1={}", part1::eval(&filedata));
-    //println!("part2={}", part2::eval(&filedata).unwrap());
-    part2::eval(&filedata);
-    enc::run();
+    println!("part2={}", part2::eval());
 }

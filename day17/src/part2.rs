@@ -1,137 +1,54 @@
-use crate::input::Input;
+use crate::vm;
 
-struct VM {
-  a: i64,
-  b: i64,
-  c: i64,
-  i: usize,
-  prog: Vec<i32>,
-  match_count: usize,
-  max_match: usize,
+const PROG: &[i32] = &[2, 4, 1, 5, 7, 5, 0, 3, 4, 0, 1, 6, 5, 5, 3, 0];
+// Notes:
+//
+//  2 4  bst  B = A % 8    // Use first 3 bits of A.
+//  1 5  bxl  B = B ^ 5
+//  7 5  cdv  C = A >> B   // Use 3 bits 0-7 bits from start.
+//  0 3  adv  A = A >> 3   // Discard 3 bits from A.
+//  4 0  bxc  B = B ^ C
+//  1 6  bxl  B = B ^ 6
+//  5 5  out  B % 8
+//  3 0  jnz  loop
+//
+// Each output is the first 3 bits (B) xor'ed with 3 bits (C) that are 0-7 bits
+// from the beginning of the input.
+
+pub fn eval() -> i64 {
+  let mut r: Vec<u8> = PROG.iter().map(|&e| e as u8).collect();
+  r.reverse();
+  encode(&r, 0, &[]).unwrap()
 }
 
-impl VM {
-  pub fn new(input: &Input) -> VM {
-    VM {
-      a: 0,
-      b: 0,
-      c: 0,
-      i: 0,
-      prog: input.prog.clone(),
-      match_count: 0,
-      max_match: 0,
-    }
+fn encode(vs: &[u8], a: i64, exp: &[u8]) -> Option<i64> {
+  if vs.is_empty() {
+    return Some(a);
   }
 
-  pub fn run(&mut self, a: i64) -> bool {
-    println!("run {}", a);
-    self.a = a;
-    self.b = 0;
-    self.c = 0;
-    self.i = 0;
-    self.match_count = 0;
+  let v = vs[0];
+  let vs = &vs[1..];
 
-    loop {
-      println!("{} a: {}, b: {}, c: {}", self.match_count, self.a, self.b, self.c);
-      if self.i + 1 >= self.prog.len() {
-        return self.match_count == self.prog.len();
-      }
-      let op = self.prog[self.i];
-      let operand = self.prog[self.i + 1];
-      self.i += 2;
+  let mut new_exp = Vec::new();
+  new_exp.push(v);
+  new_exp.extend_from_slice(exp);
 
-      match op {
-        0 => {
-          // adv
-          print!("adv ");
-          let d = 2_i64.pow(self.combo(operand) as u32);
-          self.a = self.a / d;
+  let mut lowest = None;
+  for b in 0..0b111 {
+    let b2 = b ^ 5;
+    let b3 = b2 ^ 6;
+    let c = b3 ^ v;
+    let x = (a << 3) | (b as i64);
+    let x = x | ((c as i64) << b2);
+
+    let res = vm::eval(PROG, x);
+    if !res.is_empty() && res == new_exp {
+      if let Some(a) = encode(vs, x, &new_exp) {
+        if lowest.is_none() || a < lowest.unwrap() {
+          lowest = Some(a);
         }
-        1 => {
-          // bxl
-          print!("bxl ");
-          self.b = self.b ^ (operand as i64);
-        }
-        2 => {
-          // bst
-          print!("bst ");
-          self.b = self.combo(operand) % 8;
-        }
-        3 => {
-          // jnz
-          print!("jnz ");
-          if self.a != 0 {
-            self.i = operand as usize;
-          }
-        }
-        4 => {
-          // bxc
-          print!("bxc ");
-          self.b = self.b ^ self.c;
-        }
-        5 => {
-          // out
-          if self.match_count == self.prog.len() {
-            return false;
-          }
-          let out = self.combo(operand) % 8;
-          println!("out: {}", out);
-          if self.prog[self.match_count] != (out as i32) {
-            return false;
-          }
-          self.match_count += 1;
-          if self.match_count >= self.max_match {
-            self.max_match = self.match_count;
-          }
-        }
-        6 => {
-          // bdv
-          print!("bdv ");
-          let d = 2_i64.pow(self.combo(operand) as u32);
-          self.b = self.a / d;
-        }
-        7 => {
-          // cdv
-          println!("discard {}", self.combo(operand));
-          print!("cdv ");
-          let d = 2_i64.pow(self.combo(operand) as u32);
-          self.c = self.a / d;
-        }
-        _ => panic!(),
       }
     }
   }
-
-  fn combo(&self, operand: i32) -> i64 {
-    match operand {
-      0..=3 => operand as i64,
-      4 => self.a,
-      5 => self.b,
-      6 => self.c,
-      _ => panic!("Invalid operand {}", operand),
-    }
-  }
-}
-
-pub fn eval(s: &str) -> Option<i64> {
-  let input = Input::parse(s);
-  let mut vm = VM::new(&input);
-
-  let nums = [
-    4491610522, 4491611905, 4491611913, 4491637513, 4491676058, 4491677441, 4491677449, 4541942170,
-    4541943553, 4541943561, 4541969161,
-  ];
-  for n in nums {
-    vm.run(n);
-  }
-
-  /*
-  for i in 0..i64::MAX {
-      if vm.run(i) {
-          return Some(i);
-      }
-  }
-  */
-
-  None
+  lowest
 }

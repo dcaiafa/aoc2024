@@ -1,5 +1,3 @@
-use crate::input::Input;
-
 struct VM {
   a: i64,
   b: i64,
@@ -33,8 +31,7 @@ impl VM {
       match op {
         0 => {
           // adv
-          let d = 2_i64.pow(self.combo(operand) as u32);
-          self.a = self.a / d;
+          self.a = self.a >> self.combo(operand);
         }
         1 => {
           // bxl
@@ -60,13 +57,11 @@ impl VM {
         }
         6 => {
           // bdv
-          let d = 2_i64.pow(self.combo(operand) as u32);
-          self.b = self.a / d;
+          self.b = self.a >> self.combo(operand); 
         }
         7 => {
           // cdv
-          let d = 2_i64.pow(self.combo(operand) as u32);
-          self.c = self.a / d;
+          self.c = self.a >> self.combo(operand); 
         }
         _ => panic!(),
       }
