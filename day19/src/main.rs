@@ -1,3 +1,4 @@
+mod towel_trie;
 mod part1;
 
 fn main() {
