@@ -1,4 +1,4 @@
-use std::collections::{BinaryHeap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct V(pub i32, pub i32);
@@ -179,6 +179,64 @@ impl<'a> SearchBest<'a> {
     }
 
     None
+  }
+}
+
+struct SearchCheat<'a> {
+  input: &'a Input,
+  pqueue: BinaryHeap<OrdPath>,
+  memo: HashMap<(V, i32), i32>,
+  best: i32,
+  count: i32,
+}
+
+impl<'a> SearchCheat<'a> {
+  pub fn search(input: &'a Input, best: i32) -> i32 {
+    let mut srch = SearchCheat {
+      input,
+      pqueue: BinaryHeap::new(),
+      memo: HashMap::new(),
+      best,
+      count: 0,
+    };
+    srch.run();
+    srch.count
+  }
+
+  fn run(&mut self) {
+    let path = Path {
+      pos: self.input.start,
+      path: vec![self.input.start],
+      score: self.input.goal_dist(self.input.start),
+      cheat: 2,
+    };
+    self.pqueue.push(OrdPath(path));
+
+    while let Some(OrdPath(path)) = self.pqueue.pop() {
+      [V(0, -1), V(0, 1), V(-1, 0), V(1, 0)]
+        .into_iter()
+        .map(|d| path.pos + d)
+        .for_each(|pos| {
+          if !self.input.is_track(pos) {
+            return;
+          }
+          if let Some(
+
+          let already_visited = !self.visited.insert(pos);
+          if already_visited {
+            return;
+          }
+
+          let mut new_path = path.path.clone();
+          new_path.push(pos);
+          self.pqueue.push(OrdPath(Path {
+            pos,
+            score: (new_path.len() as i32) + self.input.goal_dist(pos),
+            path: new_path,
+            cheat: 0,
+          }));
+        });
+    }
   }
 }
 
